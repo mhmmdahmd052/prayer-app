@@ -3,137 +3,150 @@
 <head>
 <meta charset="UTF-8">
 <title>لوحة مراقبة أوقات الصلاة - بيشكك</title>
+
 <style>
-body { font-family: Arial, sans-serif; background: #f9f9f9; color: #333; padding: 20px; }
-h1 { text-align: center; margin-bottom: 10px; }
-#current-time { text-align: center; font-size: 1.2em; margin-bottom: 20px; }
-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-th, td { border: 1px solid #ccc; padding: 5px; text-align: center; }
-th { background-color: #eee; }
-.next-prayer { background-color: #d4edda; font-weight: bold; }
+body {
+  font-family: Arial, sans-serif;
+  background: #f9f9f9;
+  padding: 20px;
+}
+h1 { text-align: center; }
+#current-time {
+  text-align: center;
+  font-size: 1.2em;
+  margin-bottom: 15px;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+th, td {
+  border: 1px solid #ccc;
+  padding: 6px;
+  text-align: center;
+}
+th { background: #eee; }
+.next { background: #d4edda; font-weight: bold; }
 </style>
 </head>
+
 <body>
 
 <h1>لوحة مراقبة أوقات الصلاة - بيشكك</h1>
-<div id="current-time">جارٍ تحميل الوقت...</div>
-<table id="prayer-table">
-    <thead>
-        <tr>
-            <th>التاريخ</th>
-            <th>الفجر</th>
-            <th>الشروق</th>
-            <th>الظهر</th>
-            <th>العصر</th>
-            <th>المغرب</th>
-            <th>العشاء</th>
-            <th>الصلاة القادمة</th>
-            <th>العد التنازلي</th>
-        </tr>
-    </thead>
-    <tbody id="calendar-body">
-        <tr><td colspan="9">جارٍ تحميل البيانات...</td></tr>
-    </tbody>
+<div id="current-time"></div>
+
+<table>
+<thead>
+<tr>
+<th>التاريخ</th>
+<th>الفجر</th>
+<th>الشروق</th>
+<th>الظهر</th>
+<th>العصر</th>
+<th>المغرب</th>
+<th>العشاء</th>
+<th>الصلاة القادمة</th>
+<th>العد التنازلي</th>
+</tr>
+</thead>
+<tbody id="body">
+<tr><td colspan="9">جارٍ التحميل…</td></tr>
+</tbody>
 </table>
 
 <script>
-let lastDataJSON = null;
+const API_URL =
+  "https://api.allorigins.win/raw?url=" +
+  encodeURIComponent("https://muftiyat.kg/ru/api/v1/calendar/1/");
 
-function updateCurrentTime() {
-    const now = new Date();
-    const formattedTime = now.toLocaleTimeString('ar-EG', { hour12: false });
-    document.getElementById("current-time").textContent = `الوقت الحالي: ${formattedTime}`;
+let calendar = [];
+
+/* الوقت الحالي */
+function updateClock() {
+  const now = new Date();
+  document.getElementById("current-time").textContent =
+    "الوقت الحالي: " +
+    now.toLocaleTimeString("ar-EG", { hour12: false });
 }
 
-function getCountdown(targetTime) {
-    const now = new Date();
-    const diff = targetTime - now;
-    if(diff <= 0) return "انتهت";
-    const hours = Math.floor(diff/1000/3600);
-    const minutes = Math.floor((diff/1000%3600)/60);
-    const seconds = Math.floor(diff/1000%60);
-    return `${hours.toString().padStart(2,'0')}:${minutes.toString().padStart(2,'0')}:${seconds.toString().padStart(2,'0')}`;
+/* تحميل أوقات الصلاة (كل 6 ساعات) */
+async function loadCalendar() {
+  try {
+    const res = await fetch(API_URL, { cache: "no-store" });
+    calendar = await res.json();
+    render();
+  } catch {
+    document.getElementById("body").innerHTML =
+      "<tr><td colspan='9'>فشل تحميل أوقات الصلاة</td></tr>";
+  }
 }
 
-function getNextPrayerCountdown(day) {
-    const now = new Date();
-    const prayerTimes = ['fajr','shurooq','zuhr','asr','maghrib','isha'];
-    for(let pt of prayerTimes){
-        const [hours, minutes] = day[pt].split(':').map(Number);
-        const prayerDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes);
-        if(prayerDate > now) return {name: pt, countdown: getCountdown(prayerDate), diff: (prayerDate-now)/60000};
+/* حساب الصلاة القادمة */
+function nextPrayer(day) {
+  const now = new Date();
+  const keys = ["fajr","shurooq","zuhr","asr","maghrib","isha"];
+  for (let k of keys) {
+    const [h,m] = day[k].split(":");
+    const t = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate(),
+      h, m
+    );
+    if (t > now) return { name: k, time: t };
+  }
+  return null;
+}
+
+/* رسم الجدول */
+function render() {
+  const tbody = document.getElementById("body");
+  tbody.innerHTML = "";
+
+  const today = new Date().toDateString();
+
+  calendar.forEach(d => {
+    const [dd,mm,yy] = d.date.split("-");
+    const date = new Date(yy, mm-1, dd);
+    const isToday = date.toDateString() === today;
+
+    let next = isToday ? nextPrayer(d) : null;
+    let countdown = "-";
+    let name = "-";
+
+    if (next) {
+      const diff = next.time - new Date();
+      const h = String(Math.floor(diff/3600000)).padStart(2,"0");
+      const m = String(Math.floor(diff%3600000/60000)).padStart(2,"0");
+      const s = String(Math.floor(diff%60000/1000)).padStart(2,"0");
+      countdown = `${h}:${m}:${s}`;
+      name = {
+        fajr:"الفجر", shurooq:"الشروق", zuhr:"الظهر",
+        asr:"العصر", maghrib:"المغرب", isha:"العشاء"
+      }[next.name];
     }
-    return {name: 'انتهت', countdown: '-', diff: 0};
+
+    tbody.innerHTML += `
+<tr class="${isToday ? "next":""}">
+<td>${date.toLocaleDateString("ar-EG")}</td>
+<td>${d.fajr}</td>
+<td>${d.shurooq}</td>
+<td>${d.zuhr}</td>
+<td>${d.asr}</td>
+<td>${d.maghrib}</td>
+<td>${d.isha}</td>
+<td>${name}</td>
+<td>${countdown}</td>
+</tr>`;
+  });
 }
 
-function getCountdownColor(diffMinutes) {
-    if(diffMinutes > 30) return "green";
-    if(diffMinutes > 10) return "orange";
-    if(diffMinutes >= 0) return "red";
-    return "black";
-}
-
-async function fetchPrayerCalendar() {
-    const tbody = document.getElementById("calendar-body");
-    try {
-        const corsProxy = "https://api.allorigins.win/get?url=";
-        const url = corsProxy + encodeURIComponent("https://muftiyat.kg/ru/api/v1/calendar/1/");
-        const response = await fetch(url);
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        const textData = await response.json();
-        const data = JSON.parse(textData.contents);
-
-        const currentDataJSON = JSON.stringify(data);
-        if(currentDataJSON === lastDataJSON) return;
-        lastDataJSON = currentDataJSON;
-
-        tbody.innerHTML = "";
-        let todayRow = null;
-
-        data.forEach((day) => {
-            const [dayNum, monthNum, yearNum] = day.date.split('-').map(Number);
-            const dateObj = new Date(yearNum, monthNum - 1, dayNum);
-            const arabicDate = dateObj.toLocaleDateString('ar-EG', { weekday:'short', year:'numeric', month:'short', day:'numeric' });
-
-            const nextPrayer = getNextPrayerCountdown(day);
-            const nextPrayerName = {
-                'fajr':'الفجر', 'shurooq':'الشروق', 'zuhr':'الظهر', 'asr':'العصر', 'maghrib':'المغرب', 'isha':'العشاء','انتهت':'انتهت'
-            }[nextPrayer.name];
-
-            const countdownColor = getCountdownColor(nextPrayer.diff);
-
-            const row = document.createElement("tr");
-            row.innerHTML = `
-                <td>${arabicDate}</td>
-                <td>${day.fajr}</td>
-                <td>${day.shurooq}</td>
-                <td>${day.zuhr}</td>
-                <td>${day.asr}</td>
-                <td>${day.maghrib}</td>
-                <td>${day.isha}</td>
-                <td class="${nextPrayer.name !== 'انتهت' ? 'next-prayer':''}">${nextPrayerName}</td>
-                <td style="color:${countdownColor}">${nextPrayer.countdown}</td>
-            `;
-            tbody.appendChild(row);
-
-            if(dateObj.toDateString() === new Date().toDateString()) todayRow = row;
-        });
-
-        if(todayRow){
-            todayRow.scrollIntoView({behavior:"smooth", block:"center"});
-        }
-
-    } catch (error) {
-        console.error("خطأ في جلب أوقات الصلاة:", error);
-        tbody.innerHTML = "<tr><td colspan='9'>فشل تحميل أوقات الصلاة</td></tr>";
-    }
-}
-
-setInterval(updateCurrentTime, 1000);
-setInterval(fetchPrayerCalendar, 1000);
-
-updateCurrentTime();
-fetchPrayerCalendar();
+/* التشغيل */
+updateClock();
+setInterval(updateClock, 1000);
+loadCalendar();
+setInterval(loadCalendar, 6 * 60 * 60 * 1000); // كل 6 ساعات
+setInterval(render, 1000); // تحديث العد التنازلي
 </script>
 
 </body>
