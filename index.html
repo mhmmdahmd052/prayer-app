@@ -4,26 +4,11 @@
 <meta charset="UTF-8">
 <title>لوحة مراقبة أوقات الصلاة - بيشكك</title>
 <style>
-body {
-  font-family: Arial, sans-serif;
-  background: #f9f9f9;
-  padding: 20px;
-}
+body { font-family: Arial, sans-serif; background: #f9f9f9; padding: 20px; }
 h1 { text-align: center; }
-#current-time {
-  text-align: center;
-  font-size: 1.2em;
-  margin-bottom: 15px;
-}
-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-th, td {
-  border: 1px solid #ccc;
-  padding: 6px;
-  text-align: center;
-}
+#current-time { text-align: center; font-size: 1.2em; margin-bottom: 15px; }
+table { width: 100%; border-collapse: collapse; }
+th, td { border: 1px solid #ccc; padding: 6px; text-align: center; }
 th { background: #eee; }
 .today { background: #d4edda; font-weight: bold; }
 </style>
@@ -53,7 +38,7 @@ th { background: #eee; }
 </table>
 
 <script>
-const API_URL = "https://dumk-proxy.spongebooob6.workers.dev/"; // ضع هنا رابط الـ Worker
+const API_URL = "https://dumk-proxy.spongebooob.workers.dev/"; // استبدل برابط Worker
 
 let prayertimes = [];
 
@@ -77,9 +62,12 @@ async function loadData() {
   }
 }
 
-/* إيجاد الصلاة القادمة لكل يوم */
+/* إيجاد الصلاة القادمة لكل يوم باستخدام تاريخ ووقت JSON */
 function nextPrayer(day) {
   const now = new Date();
+  const [dd, mm, yy] = day.date.split("-");
+  const todayDate = new Date(yy, mm-1, dd);
+
   const map = [
     ["fajr","الفجر"],
     ["sunrise","الشروق"],
@@ -88,15 +76,16 @@ function nextPrayer(day) {
     ["maghrib","المغرب"],
     ["isha","العشاء"]
   ];
+
   for (let [key,name] of map) {
     const [h,m] = day[key].split(":");
-    const t = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m);
+    const t = new Date(todayDate.getFullYear(), todayDate.getMonth(), todayDate.getDate(), h, m);
     if (t > now) return { name, time: t };
   }
   return null;
 }
 
-/* رسم الجدول */
+/* رسم الجدول لكل الأيام */
 function render() {
   const tbody = document.getElementById("body");
   tbody.innerHTML = "";
