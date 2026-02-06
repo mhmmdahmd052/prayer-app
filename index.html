@@ -3,7 +3,6 @@
 <head>
 <meta charset="UTF-8">
 <title>لوحة مراقبة أوقات الصلاة - بيشكك</title>
-
 <style>
 body {
   font-family: Arial, sans-serif;
@@ -29,11 +28,10 @@ th { background: #eee; }
 .today { background: #d4edda; font-weight: bold; }
 </style>
 </head>
-
 <body>
 
 <h1>لوحة مراقبة أوقات الصلاة - بيشكك</h1>
-<div id="current-time"></div>
+<div id="current-time">جارٍ تحميل الوقت...</div>
 
 <table>
 <thead>
@@ -55,24 +53,23 @@ th { background: #eee; }
 </table>
 
 <script>
-const API_URL = "https://dumk-proxy.spongebooob6.workers.dev/";
+const API_URL = "https://dumk-proxy.spongebooob6.workers.dev/"; // ضع هنا رابط الـ Worker
 
 let prayertimes = [];
 
-/* الوقت الحالي */
+/* تحديث الوقت الحالي بالثانية */
 function updateClock() {
   const now = new Date();
   document.getElementById("current-time").textContent =
-    "الوقت الحالي: " +
-    now.toLocaleTimeString("ar-EG", { hour12: false });
+    "الوقت الحالي: " + now.toLocaleTimeString("ar-EG", { hour12: false });
 }
 
-/* تحميل البيانات كل 6 ساعات */
+/* تحميل بيانات الشهر من Worker */
 async function loadData() {
   try {
     const res = await fetch(API_URL, { cache: "no-store" });
     const json = await res.json();
-    prayertimes = json.prayertimes;
+    prayertimes = json.prayertimes || [];
     render();
   } catch {
     document.getElementById("body").innerHTML =
@@ -80,7 +77,7 @@ async function loadData() {
   }
 }
 
-/* الصلاة القادمة */
+/* إيجاد الصلاة القادمة لكل يوم */
 function nextPrayer(day) {
   const now = new Date();
   const map = [
@@ -91,15 +88,9 @@ function nextPrayer(day) {
     ["maghrib","المغرب"],
     ["isha","العشاء"]
   ];
-
   for (let [key,name] of map) {
     const [h,m] = day[key].split(":");
-    const t = new Date(
-      now.getFullYear(),
-      now.getMonth(),
-      now.getDate(),
-      h, m
-    );
+    const t = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m);
     if (t > now) return { name, time: t };
   }
   return null;
@@ -109,7 +100,6 @@ function nextPrayer(day) {
 function render() {
   const tbody = document.getElementById("body");
   tbody.innerHTML = "";
-
   const today = new Date().toDateString();
 
   prayertimes.forEach(d => {
@@ -117,13 +107,13 @@ function render() {
     const date = new Date(yy, mm-1, dd);
     const isToday = date.toDateString() === today;
 
-    let name = "-";
+    let nextName = "-";
     let countdown = "-";
 
     if (isToday) {
       const next = nextPrayer(d);
       if (next) {
-        name = next.name;
+        nextName = next.name;
         const diff = next.time - new Date();
         const h = String(Math.floor(diff/3600000)).padStart(2,"0");
         const m = String(Math.floor(diff%3600000/60000)).padStart(2,"0");
@@ -141,18 +131,18 @@ function render() {
 <td>${d.asr}</td>
 <td>${d.maghrib}</td>
 <td>${d.isha}</td>
-<td>${name}</td>
+<td>${nextName}</td>
 <td>${countdown}</td>
 </tr>`;
   });
 }
 
-/* تشغيل */
+/* تشغيل كل شيء */
 updateClock();
-setInterval(updateClock, 1000);
-loadData();
-setInterval(loadData, 6 * 60 * 60 * 1000);
-setInterval(render, 1000);
+setInterval(updateClock, 1000);         // تحديث الوقت بالثانية
+loadData();                              // تحميل بيانات الشهر
+setInterval(loadData, 6*60*60*1000);     // تحديث كل 6 ساعات
+setInterval(render, 1000);               // تحديث العد التنازلي بالثانية
 </script>
 
 </body>
