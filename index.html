@@ -26,7 +26,7 @@ th, td {
   text-align: center;
 }
 th { background: #eee; }
-.next { background: #d4edda; font-weight: bold; }
+.today { background: #d4edda; font-weight: bold; }
 </style>
 </head>
 
@@ -55,11 +55,9 @@ th { background: #eee; }
 </table>
 
 <script>
-const API_URL =
-  "https://api.allorigins.win/raw?url=" +
-  encodeURIComponent("https://muftiyat.kg/ru/api/v1/calendar/1/");
+const API_URL = "https://dumk-proxy.spongebooob6.workers.dev/";
 
-let calendar = [];
+let prayertimes = [];
 
 /* الوقت الحالي */
 function updateClock() {
@@ -69,11 +67,12 @@ function updateClock() {
     now.toLocaleTimeString("ar-EG", { hour12: false });
 }
 
-/* تحميل أوقات الصلاة (كل 6 ساعات) */
-async function loadCalendar() {
+/* تحميل البيانات كل 6 ساعات */
+async function loadData() {
   try {
     const res = await fetch(API_URL, { cache: "no-store" });
-    calendar = await res.json();
+    const json = await res.json();
+    prayertimes = json.prayertimes;
     render();
   } catch {
     document.getElementById("body").innerHTML =
@@ -81,19 +80,27 @@ async function loadCalendar() {
   }
 }
 
-/* حساب الصلاة القادمة */
+/* الصلاة القادمة */
 function nextPrayer(day) {
   const now = new Date();
-  const keys = ["fajr","shurooq","zuhr","asr","maghrib","isha"];
-  for (let k of keys) {
-    const [h,m] = day[k].split(":");
+  const map = [
+    ["fajr","الفجر"],
+    ["sunrise","الشروق"],
+    ["dhuhr","الظهر"],
+    ["asr","العصر"],
+    ["maghrib","المغرب"],
+    ["isha","العشاء"]
+  ];
+
+  for (let [key,name] of map) {
+    const [h,m] = day[key].split(":");
     const t = new Date(
       now.getFullYear(),
       now.getMonth(),
       now.getDate(),
       h, m
     );
-    if (t > now) return { name: k, time: t };
+    if (t > now) return { name, time: t };
   }
   return null;
 }
@@ -105,33 +112,32 @@ function render() {
 
   const today = new Date().toDateString();
 
-  calendar.forEach(d => {
+  prayertimes.forEach(d => {
     const [dd,mm,yy] = d.date.split("-");
     const date = new Date(yy, mm-1, dd);
     const isToday = date.toDateString() === today;
 
-    let next = isToday ? nextPrayer(d) : null;
-    let countdown = "-";
     let name = "-";
+    let countdown = "-";
 
-    if (next) {
-      const diff = next.time - new Date();
-      const h = String(Math.floor(diff/3600000)).padStart(2,"0");
-      const m = String(Math.floor(diff%3600000/60000)).padStart(2,"0");
-      const s = String(Math.floor(diff%60000/1000)).padStart(2,"0");
-      countdown = `${h}:${m}:${s}`;
-      name = {
-        fajr:"الفجر", shurooq:"الشروق", zuhr:"الظهر",
-        asr:"العصر", maghrib:"المغرب", isha:"العشاء"
-      }[next.name];
+    if (isToday) {
+      const next = nextPrayer(d);
+      if (next) {
+        name = next.name;
+        const diff = next.time - new Date();
+        const h = String(Math.floor(diff/3600000)).padStart(2,"0");
+        const m = String(Math.floor(diff%3600000/60000)).padStart(2,"0");
+        const s = String(Math.floor(diff%60000/1000)).padStart(2,"0");
+        countdown = `${h}:${m}:${s}`;
+      }
     }
 
     tbody.innerHTML += `
-<tr class="${isToday ? "next":""}">
+<tr class="${isToday ? "today":""}">
 <td>${date.toLocaleDateString("ar-EG")}</td>
 <td>${d.fajr}</td>
-<td>${d.shurooq}</td>
-<td>${d.zuhr}</td>
+<td>${d.sunrise}</td>
+<td>${d.dhuhr}</td>
 <td>${d.asr}</td>
 <td>${d.maghrib}</td>
 <td>${d.isha}</td>
@@ -141,12 +147,12 @@ function render() {
   });
 }
 
-/* التشغيل */
+/* تشغيل */
 updateClock();
 setInterval(updateClock, 1000);
-loadCalendar();
-setInterval(loadCalendar, 6 * 60 * 60 * 1000); // كل 6 ساعات
-setInterval(render, 1000); // تحديث العد التنازلي
+loadData();
+setInterval(loadData, 6 * 60 * 60 * 1000);
+setInterval(render, 1000);
 </script>
 
 </body>
